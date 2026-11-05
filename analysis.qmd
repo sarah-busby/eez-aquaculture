@@ -117,6 +117,65 @@ levels(oyster_habitat) <- data.frame(
 species = "Oyster"
 title = paste("Suitable Habitat for", species)
 tm_shape(oyster_habitat) +
-    tm_raster(col.legend = tm_legend("Suitable habitat for oyster aquaculture")) +
+    tm_raster(col.legend = tm_legend("Suitable habitat for oyster aquaculture"),
+              col.scale = tm_scale_categorical(values = c('lightblue', 'darkgreen'))) +
     tm_title(title)
 ```
+
+```{r}
+# Define function
+
+suitable_ezz <- function(species, temp_min, temp_max, depth_min, depth_max) {
+
+    # Define rcl for depth & temp
+    rcl_depth <- matrix(c(
+        -Inf,      depth_min, 0,   
+        depth_min, depth_max, 1,   
+        depth_max, Inf, 0    
+    ), ncol = 3, byrow = TRUE)
+
+    rcl_temp <- matrix(c(
+        -Inf,      temp_min, 0,   
+        temp_min, temp_max, 1,   
+        temp_max, Inf, 0    
+    ), ncol = 3, byrow = TRUE)
+
+    habitat_depth <- as.factor(classify(depth_sst[[1]], rcl = rcl_depth))
+
+    habitat_temp <- as.factor(classify(depth_sst[[2]], rcl = rcl_temp))
+
+    # Create raster of habitat suitable depth and temp
+    species_habitat <- as.factor(habitat_depth * habitat_temp)
+    levels(species_habitat) <- data.frame(
+        value = 0:1,
+        label = c("Not Suitable", "Suitable")
+    )
+
+    # Map suitable habitat
+    title = paste("Suitable habitat for", species, "aquaculture")
+    map <- tm_shape(species_habitat) +
+            tm_raster(col.legend = tm_legend("Habitat status"), 
+                      col.scale = tm_scale_categorical(values = c('lightblue', 'darkgreen'))) +
+            tm_title(title)
+
+    # Return value
+    return(map) 
+}
+```
+
+```{r}
+suitable_ezz(species='oyster',
+             temp_min = 11, temp_max = 30, 
+             depth_min = -70, depth_max = 0
+             )
+```
+
+```{r}
+# Check suitable habitat for red abalone
+suitable_ezz(species='red abalone',
+             temp_min = 8, temp_max = 18, 
+             depth_min = -24, depth_max = 0
+             )
+```
+
+https://www.sealifebase.ca/summary/Haliotis-rufescens.html

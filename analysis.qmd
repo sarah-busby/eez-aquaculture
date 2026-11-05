@@ -1,4 +1,4 @@
-# EZZ suitable for aquaculture
+# EEZ suitable for aquaculture
 
 ## Prepare data
 First, necessary data is loaded and
@@ -12,8 +12,8 @@ library(sf)
 ```
 
 ```{r}
-# Read in West Coast EZZ shapefile
-ezz <- st_read("data/wc_regions_clean.shp")
+# Read in West Coast EEZ shapefile
+eez <- st_read("data/wc_regions_clean.shp")
 ```
 
 ```{r}
@@ -33,9 +33,9 @@ sst_stack <- c(sst_08, sst_09, sst_10, sst_11, sst_12)
 ```
 
 ```{r}
-same.crs(ezz, depth)
-same.crs(ezz, sst_stack)
-st_crs(ezz) == st_crs(depth)
+same.crs(eez, depth)
+same.crs(eez, sst_stack)
+st_crs(eez) == st_crs(depth)
 st_crs(sst_stack)
 ```
 
@@ -43,7 +43,7 @@ st_crs(sst_stack)
 
 ```{r}
 # Find mean temp across 2008-2012
-sst_mean <- app(sst_stack, fun = mean)
+sst_mean <- app(sst_stack, fun = mean, na.rm = TRUE)
 
 # Convert SST from K to C
 sst_mean <- sst_mean - 273.15
@@ -93,12 +93,12 @@ rcl_temp <- matrix(c(
    temp_max, Inf, 0    
 ), ncol = 3, byrow = TRUE)
 
-oyster_depth <- as.factor(classify(depth_sst[[1]], rcl = rcl_depth))
+oyster_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
 
-oyster_temp <- as.factor(classify(depth_sst[[2]], rcl = rcl_temp))
+oyster_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
 ```
 
-## Determine most suitable EZZ
+## Determine most suitable EEZ
 
 ```{r}
 tm_shape(oyster_temp) +
@@ -107,7 +107,7 @@ tm_shape(oyster_temp) +
 
 
 ```{r}
-oyster_habitat <- as.factor(oyster_temp * oyster_depth)
+oyster_habitat <- oyster_temp * oyster_depth
 
 levels(oyster_habitat) <- data.frame(
   value = 0:1,
@@ -123,9 +123,49 @@ tm_shape(oyster_habitat) +
 ```
 
 ```{r}
+head(eez)
+```
+```{r}
+## Determine most suitable EEZ
+# Rasterize eez regions
+eez_rast <- rasterize(eez, oyster_habitat, field = 'rgn')
+
+same.crs(eez_rast, oyster_habitat)
+```
+
+```{r}
+# Turn suitable habitat into area km2 (instead of degrees)
+habitat_cell_size <- cellSize(oyster_habitat, unit = 'km')
+suitable_area = oyster_habitat * habitat_cell_size
+names(suitable_area) <- "suitable_area_km2"
+```
+
+```{r}
+eez_priority = zonal(suitable_area, eez_rast, fun = 'sum', na.rm = TRUE)
+```
+
+```{r}
+eez_priority_zones <- eez |> 
+    left_join(eez_priority,
+              by = "rgn",
+             )
+```
+
+```{r}
+tm_basemap(server = "Esri.WorldTopoMap") +
+tm_shape(eez_priority_zones) +
+    tm_polygons(fill='suitable_area_km2',
+                fill_alpha=0.5,
+                fill.scale = tm_scale_continuous(values='brewer.blues'),
+                fill.legend = tm_legend(title=)
+               ) +
+    tm_text('rgn_key')
+```
+
+```{r}
 # Define function
 
-suitable_ezz <- function(species, temp_min, temp_max, depth_min, depth_max) {
+suitable_eez <- function(species, temp_min, temp_max, depth_min, depth_max) {
 
     # Define rcl for depth & temp
     rcl_depth <- matrix(c(
@@ -140,12 +180,12 @@ suitable_ezz <- function(species, temp_min, temp_max, depth_min, depth_max) {
         temp_max, Inf, 0    
     ), ncol = 3, byrow = TRUE)
 
-    habitat_depth <- as.factor(classify(depth_sst[[1]], rcl = rcl_depth))
+    habitat_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
 
-    habitat_temp <- as.factor(classify(depth_sst[[2]], rcl = rcl_temp))
+    habitat_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
 
     # Create raster of habitat suitable depth and temp
-    species_habitat <- as.factor(habitat_depth * habitat_temp)
+    species_habitat <- habitat_depth * habitat_temp
     levels(species_habitat) <- data.frame(
         value = 0:1,
         label = c("Not Suitable", "Suitable")
@@ -164,7 +204,7 @@ suitable_ezz <- function(species, temp_min, temp_max, depth_min, depth_max) {
 ```
 
 ```{r}
-suitable_ezz(species='oyster',
+suitable_eez(species='oyster',
              temp_min = 11, temp_max = 30, 
              depth_min = -70, depth_max = 0
              )
@@ -172,7 +212,7 @@ suitable_ezz(species='oyster',
 
 ```{r}
 # Check suitable habitat for red abalone
-suitable_ezz(species='red abalone',
+suitable_eez(species='red abalone',
              temp_min = 8, temp_max = 18, 
              depth_min = -24, depth_max = 0
              )

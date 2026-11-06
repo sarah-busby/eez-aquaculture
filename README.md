@@ -1,1 +1,1 @@
-# ezz-aquaculture
+# Determining EEZ Priority Zones for Aquaculture

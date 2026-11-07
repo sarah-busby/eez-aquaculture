@@ -1,9 +1,18 @@
-# EEZ suitable for aquaculture
+---
+title: EEZ suitable for aquaculture species
+subtitle: EDS 223 HW Assignment \#3
+author: Sarah Busby
+# format:
+#   pdf:
+#     colorlinks: true
+#     warning: false
+---
 
 ## Prepare data
 First, necessary data is loaded and
 
 ```{r}
+#| output: false
 # Load libraries
 library(terra)
 library(tidyverse)
@@ -12,6 +21,7 @@ library(sf)
 ```
 
 ```{r}
+#| output: false
 # Read in West Coast EEZ shapefile
 eez <- st_read("data/wc_regions_clean.shp")
 ```
@@ -40,9 +50,10 @@ st_crs(sst_stack)
 ```
 
 ## Process data
+First, sea surface temperature across 2008-2012 will be averaged to find the mean SST for that area. Since SST is recorded in Kelvin, it will also be converted to Celcius.
 
 ```{r}
-# Find mean temp across 2008-2012
+# Find mean SST across 2008-2012
 sst_mean <- app(sst_stack, fun = mean, na.rm = TRUE)
 
 # Convert SST from K to C
@@ -57,13 +68,19 @@ depth <- crop(depth, ext(sst_mean))
 cat("\n=== Resolution comparison ===\n")
 cat("SST Resolution:", res(sst_mean), "\n")
 cat("Depth Resolution:", res(depth), "\n")
+```
 
+Since `sst_mean` is at a courser resolution than `depth`, `depth` will be resampled to match the SST data using the bilinear method.
+
+```{r}
+# Resample depth to resolution of SST 
 depth <- resample(depth, sst_mean, method = "bilinear")
 
 res(depth) == res(sst_mean)
 ext(depth) == ext(sst_mean)
 same.crs(depth, sst_mean)
 ```
+
 
 ```{r}
 # Stack depth and mean temp
@@ -98,14 +115,6 @@ oyster_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
 oyster_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
 ```
 
-## Determine most suitable EEZ
-
-```{r}
-tm_shape(oyster_temp) +
-    tm_raster(col.legend = tm_legend("Suitable temperature for oyster aquaculture"))
-```
-
-
 ```{r}
 oyster_habitat <- oyster_temp * oyster_depth
 
@@ -125,8 +134,10 @@ tm_shape(oyster_habitat) +
 ```{r}
 head(eez)
 ```
-```{r}
+
 ## Determine most suitable EEZ
+
+```{r}
 # Rasterize eez regions
 eez_rast <- rasterize(eez, oyster_habitat, field = 'rgn')
 
@@ -152,6 +163,7 @@ eez_priority_zones <- eez |>
 ```
 
 ```{r}
+# Create map for priority eez zones
 tm_basemap(server = "Esri.WorldTopoMap") +
 tm_shape(eez_priority_zones) +
     tm_polygons(fill='suitable_area_km2',
@@ -160,6 +172,75 @@ tm_shape(eez_priority_zones) +
                 fill.legend = tm_legend(title=)
                ) +
     tm_text('rgn_key')
+```
+
+```{r}
+# Define function for eez priority
+
+priority_aquaculture_eez <- function(species, temp_min, temp_max, depth_min, depth_max) {
+
+    # Define rcl for depth & temp
+    rcl_depth <- matrix(c(
+        -Inf,      depth_min, 0,   
+        depth_min, depth_max, 1,   
+        depth_max, Inf, 0    
+    ), ncol = 3, byrow = TRUE)
+
+    rcl_temp <- matrix(c(
+        -Inf,      temp_min, 0,   
+        temp_min, temp_max, 1,   
+        temp_max, Inf, 0    
+    ), ncol = 3, byrow = TRUE)
+
+    habitat_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
+
+    habitat_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
+
+    # Create raster of habitat suitable depth and temp
+    species_habitat <- habitat_depth * habitat_temp
+    levels(species_habitat) <- data.frame(
+        value = 0:1,
+        label = c("Not Suitable", "Suitable")
+    )
+
+    # Turn suitable habitat into area km2 (instead of degrees)
+    habitat_cell_size <- cellSize(species_habitat, unit = 'km')
+    suitable_area = species_habitat * habitat_cell_size
+    names(suitable_area) <- "suitable_area_km2"
+
+    # Rasterize eez regions
+    eez_rast <- rasterize(eez, species_habitat, field = 'rgn')
+
+    # Calculate priority eez by most suitable area
+    eez_priority = zonal(suitable_area, eez_rast, fun = 'sum', na.rm = TRUE)
+
+    # Join geometry to eez_priority zones
+    eez_priority_zones <- eez |> 
+        left_join(eez_priority, by = "rgn")
+
+    # Create map for priority eez zones
+    title <- paste("Priority EEZ for", species, "based on suitable habitat area")
+    map <- tm_basemap(server = "Esri.WorldTopoMap") +
+            tm_shape(eez_priority_zones) +
+            tm_polygons(fill='suitable_area_km2',
+                    fill_alpha=0.5,
+                    fill.scale = tm_scale_continuous(values='brewer.blues'),
+                    fill.legend = tm_legend(title="Suitable area in EEZ (km2)")
+                ) +
+            tm_text('rgn_key') +
+            tm_title(title)
+
+
+    # Return value
+    return(map) 
+}
+```
+
+```{r}
+priority_aquaculture_eez(species='oyster',
+                         temp_min = 11, temp_max = 30, 
+                         depth_min = -70, depth_max = 0
+                        )
 ```
 
 ```{r}

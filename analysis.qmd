@@ -2,15 +2,14 @@
 title: EEZ suitable for aquaculture species
 subtitle: EDS 223 HW Assignment \#3
 author: Sarah Busby
+date: 11/7/2026
 # format:
 #   pdf:
 #     colorlinks: true
-#     warning: false
 ---
+This analysis aims to determine priority zones for potential aquaculture species along the West Coast based on suitable area for those species. This analysis will map priority zones for oyster and red abalone species. However, the function created can assess zones for many marine species given a species' suitable range of sea surface temperature and ocean depth.
 
-## Prepare data
-First, necessary data is loaded and
-
+## Load packages
 ```{r}
 #| output: false
 # Load libraries
@@ -19,6 +18,9 @@ library(tidyverse)
 library(tmap)
 library(sf)
 ```
+
+## Import data
+Import shapefile of the EEZ boundaries, depth, and SST data from 2008-2012. 
 
 ```{r}
 #| output: false
@@ -39,18 +41,26 @@ sst_10 <- rast("data/average_annual_sst_2010.tif")
 sst_11 <- rast("data/average_annual_sst_2011.tif")
 sst_12 <- rast("data/average_annual_sst_2012.tif")
 
+# Combine rasters to one stack
 sst_stack <- c(sst_08, sst_09, sst_10, sst_11, sst_12)
 ```
 
 ```{r}
-same.crs(eez, depth)
-same.crs(eez, sst_stack)
-st_crs(eez) == st_crs(depth)
-st_crs(sst_stack)
+# Check if CRSs match
+
+if(!same.crs(eez, depth)){
+  warning("Coordinate refrence systems do not match. CRS transformed to match EEZ")
+  depth <- project(depth, "EPSG:4326")
+}
+
+if(!same.crs(eez, sst_stack)){
+  warning("Coordinate refrence systems do not match. CRS transformed to match EEZ")
+  sst_stack <- project(sst_stack, "EPSG:4326")
+}
 ```
 
 ## Process data
-First, sea surface temperature across 2008-2012 will be averaged to find the mean SST for that area. Since SST is recorded in Kelvin, it will also be converted to Celcius.
+Sea surface temperature across 2008-2012 will be averaged to find the mean SST for that area. This average will be compared against the species' suitable SST range. Since the SST data is recorded in Kelvin, it will also be converted to Celcius.
 
 ```{r}
 # Find mean SST across 2008-2012
@@ -60,12 +70,13 @@ sst_mean <- app(sst_stack, fun = mean, na.rm = TRUE)
 sst_mean <- sst_mean - 273.15
 ```
 
+Next, the depth raster will be cropped to the same extent as SST data.
+
 ```{r}
 # Crop depth raster to match extent of SST
 depth <- crop(depth, ext(sst_mean))
 
-# Match depth resolution to SST data
-cat("\n=== Resolution comparison ===\n")
+# Compare depth resolution to SST data
 cat("SST Resolution:", res(sst_mean), "\n")
 cat("Depth Resolution:", res(depth), "\n")
 ```
@@ -76,110 +87,53 @@ Since `sst_mean` is at a courser resolution than `depth`, `depth` will be resamp
 # Resample depth to resolution of SST 
 depth <- resample(depth, sst_mean, method = "bilinear")
 
-res(depth) == res(sst_mean)
-ext(depth) == ext(sst_mean)
-same.crs(depth, sst_mean)
+# Check resolution, extent, and CRSs match
+if(!all(res(depth) == res(sst_mean))){
+  warning("Resolutions do not match.")
+}
+
+if(!ext(depth) == ext(sst_mean)){
+  warning("Extents do not match.")
+}
+
+if(!same.crs(depth, sst_mean)){
+  warning("CRSs do not match.")
+}
+
 ```
 
+Now that both rasters match, they can be stacked together.
 
 ```{r}
 # Stack depth and mean temp
 depth_sst <- c(depth, sst_mean)
 ```
 
-## Find suitable locations
+## Calculate suitable habitat and determine most suitable EEZ
 
-```{r}
-# Find suitable conditions for oyster
-# Classify bounds
-depth_min = -70
-depth_max = 0
+With a clean raster of depth and sst data for the region, the next steps are to compare the suitable SST and depth range of species to the area. The function below takes the following parameters:
 
-temp_min = 11
-temp_max = 30
+| Parameter | Class | Description |
+| --- | --- | --- |
+| `species` | character | The name of the species. |
+| `temp_min` | numeric | The minimum suitable temp for the species. |
+| `temp_max` | numeric | The maximum suitable temp for the species. |
+| `depth_min` | numeric | The minimum suitable depth for the species. |
+| `depth_max` | numeric | The maximum suitable depth for the species. |
+| `eez` | sf, data.frame | The shapefiles of the EEZ regions with geometries. Contains `rgn` and `rgn_key` columns. |
+| `depth_sst_rast` | SpatRaster | A stacked raster with depth (layer 1) and SST (layer 2) data |
 
-rcl_depth <- matrix(c(
-   -Inf,      depth_min, 0,   
-   depth_min, depth_max, 1,   
-   depth_max, Inf, 0    
-), ncol = 3, byrow = TRUE)
-
-rcl_temp <- matrix(c(
-   -Inf,      temp_min, 0,   
-   temp_min, temp_max, 1,   
-   temp_max, Inf, 0    
-), ncol = 3, byrow = TRUE)
-
-oyster_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
-
-oyster_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
-```
-
-```{r}
-oyster_habitat <- oyster_temp * oyster_depth
-
-levels(oyster_habitat) <- data.frame(
-  value = 0:1,
-  label = c("Not Suitable", "Suitable")
-)
-
-species = "Oyster"
-title = paste("Suitable Habitat for", species)
-tm_shape(oyster_habitat) +
-    tm_raster(col.legend = tm_legend("Suitable habitat for oyster aquaculture"),
-              col.scale = tm_scale_categorical(values = c('lightblue', 'darkgreen'))) +
-    tm_title(title)
-```
-
-```{r}
-head(eez)
-```
-
-## Determine most suitable EEZ
-
-```{r}
-# Rasterize eez regions
-eez_rast <- rasterize(eez, oyster_habitat, field = 'rgn')
-
-same.crs(eez_rast, oyster_habitat)
-```
-
-```{r}
-# Turn suitable habitat into area km2 (instead of degrees)
-habitat_cell_size <- cellSize(oyster_habitat, unit = 'km')
-suitable_area = oyster_habitat * habitat_cell_size
-names(suitable_area) <- "suitable_area_km2"
-```
-
-```{r}
-eez_priority = zonal(suitable_area, eez_rast, fun = 'sum', na.rm = TRUE)
-```
-
-```{r}
-eez_priority_zones <- eez |> 
-    left_join(eez_priority,
-              by = "rgn",
-             )
-```
-
-```{r}
-# Create map for priority eez zones
-tm_basemap(server = "Esri.WorldTopoMap") +
-tm_shape(eez_priority_zones) +
-    tm_polygons(fill='suitable_area_km2',
-                fill_alpha=0.5,
-                fill.scale = tm_scale_continuous(values='brewer.blues'),
-                fill.legend = tm_legend(title=)
-               ) +
-    tm_text('rgn_key')
-```
+The output is a map of the West Coast with EEZ priority sites for potential aquaculture of the species is shaded by the amount of suitable area within each region.
 
 ```{r}
 # Define function for eez priority
 
-priority_aquaculture_eez <- function(species, temp_min, temp_max, depth_min, depth_max) {
+priority_aquaculture_eez <- function(species, temp_min, temp_max,
+                                     depth_min, depth_max, 
+                                     eez, depth_sst_rast
+                                    ) {
 
-    # Define rcl for depth & temp
+    # Define rcl for suitable depth & temp
     rcl_depth <- matrix(c(
         -Inf,      depth_min, 0,   
         depth_min, depth_max, 1,   
@@ -187,16 +141,16 @@ priority_aquaculture_eez <- function(species, temp_min, temp_max, depth_min, dep
     ), ncol = 3, byrow = TRUE)
 
     rcl_temp <- matrix(c(
-        -Inf,      temp_min, 0,   
+        -Inf,     temp_min, 0,   
         temp_min, temp_max, 1,   
         temp_max, Inf, 0    
     ), ncol = 3, byrow = TRUE)
 
-    habitat_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
+    # Reclassify depth and temp areas to suitable or not for species
+    habitat_depth <- classify(depth_sst_rast[[1]], rcl = rcl_depth)
+    habitat_temp <- classify(depth_sst_rast[[2]], rcl = rcl_temp)
 
-    habitat_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
-
-    # Create raster of habitat suitable depth and temp
+    # Create raster of suitable depth and temp habitat
     species_habitat <- habitat_depth * habitat_temp
     levels(species_habitat) <- data.frame(
         value = 0:1,
@@ -219,84 +173,59 @@ priority_aquaculture_eez <- function(species, temp_min, temp_max, depth_min, dep
         left_join(eez_priority, by = "rgn")
 
     # Create map for priority eez zones
-    title <- paste("Priority EEZ for", species, "based on suitable habitat area")
-    map <- tm_basemap(server = "Esri.WorldTopoMap") +
-            tm_shape(eez_priority_zones) +
-            tm_polygons(fill='suitable_area_km2',
-                    fill_alpha=0.5,
-                    fill.scale = tm_scale_continuous(values='brewer.blues'),
-                    fill.legend = tm_legend(title="Suitable area in EEZ (km2)")
-                ) +
-            tm_text('rgn_key') +
-            tm_title(title)
-
+    title <- paste("Priority EEZ for", species, "\nbased on suitable habitat area")
+    eez_map <- tm_basemap(server = "Esri.WorldTopoMap") +
+                tm_graticules(alpha=0.5) +
+                tm_shape(eez_priority_zones) +
+                tm_polygons(fill='suitable_area_km2',
+                            fill_alpha=0.5,
+                            fill.scale = tm_scale_continuous(values='brewer.blues'),
+                            fill.legend = tm_legend(title="Suitable area in EEZ (km^2)")
+                        ) +
+                tm_text('rgn_key') +
+                tm_title(title) +
+                tm_compass(position = c("left", "bottom")) +
+                tm_layout(scale = 1)
 
     # Return value
-    return(map) 
+    return(eez_map) 
 }
 ```
 
+## Calculate priority EEZ regions for oyster aquaculture
+For oysters
+
+
 ```{r}
+#| warning: false
+#| message: false
 priority_aquaculture_eez(species='oyster',
                          temp_min = 11, temp_max = 30, 
-                         depth_min = -70, depth_max = 0
+                         depth_min = -70, depth_max = 0,
+                         depth_sst_rast = depth_sst,
+                         eez = eez
                         )
 ```
 
 ```{r}
-# Define function
-
-suitable_eez <- function(species, temp_min, temp_max, depth_min, depth_max) {
-
-    # Define rcl for depth & temp
-    rcl_depth <- matrix(c(
-        -Inf,      depth_min, 0,   
-        depth_min, depth_max, 1,   
-        depth_max, Inf, 0    
-    ), ncol = 3, byrow = TRUE)
-
-    rcl_temp <- matrix(c(
-        -Inf,      temp_min, 0,   
-        temp_min, temp_max, 1,   
-        temp_max, Inf, 0    
-    ), ncol = 3, byrow = TRUE)
-
-    habitat_depth <- classify(depth_sst[[1]], rcl = rcl_depth)
-
-    habitat_temp <- classify(depth_sst[[2]], rcl = rcl_temp)
-
-    # Create raster of habitat suitable depth and temp
-    species_habitat <- habitat_depth * habitat_temp
-    levels(species_habitat) <- data.frame(
-        value = 0:1,
-        label = c("Not Suitable", "Suitable")
-    )
-
-    # Map suitable habitat
-    title = paste("Suitable habitat for", species, "aquaculture")
-    map <- tm_shape(species_habitat) +
-            tm_raster(col.legend = tm_legend("Habitat status"), 
-                      col.scale = tm_scale_categorical(values = c('lightblue', 'darkgreen'))) +
-            tm_title(title)
-
-    # Return value
-    return(map) 
-}
-```
-
-```{r}
-suitable_eez(species='oyster',
-             temp_min = 11, temp_max = 30, 
-             depth_min = -70, depth_max = 0
-             )
-```
-
-```{r}
+#| warning: false
+#| message: false
 # Check suitable habitat for red abalone
-suitable_eez(species='red abalone',
-             temp_min = 8, temp_max = 18, 
-             depth_min = -24, depth_max = 0
-             )
+priority_aquaculture_eez(species='red abalone',
+                         temp_min = 8, temp_max = 18, 
+                         depth_min = -24, depth_max = 0,
+                         depth_sst_rast = depth_sst,
+                         eez = eez
+                        )
 ```
+
+## Data Citations
+
+| Data | Citation | Link |
+| --- | --- | --- |
+| EEZ shapefiles | character | The name of the species. |
+| depth raster | character | The name of the species. |
+| SST rasters | character | The name of the species. |
+| Sea animal ranges | character | https://www.sealifebase.ca/summary/Haliotis-rufescens.html |
 
 https://www.sealifebase.ca/summary/Haliotis-rufescens.html

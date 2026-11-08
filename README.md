@@ -1,4 +1,4 @@
-# Determining EEZ Priority Zones for Aquaculture
+# Determining EEZ Priority Zones for Aquaculture Species
 
 This repository contains materials for the third assignment for [EDS 223 - Geospatial Analysis & Remote Sensing](https://eds-223-geospatial.github.io/). Full instructions for this assignment can be found on [the course website](https://eds-223-geospatial.github.io/assignments/HW3.html). Per instructions, this repo explores suitable areas for potential marine aquaculture species along the West Coast of the US and determines priority Exclusive Economic Zones (EEZ) for these species based on the amount of suitbale area. The suitable area is determined based on range of suitable sea surface temperature (SST) and depth values for the species. The two species explored in this repo are oysters and red abalone. 
 

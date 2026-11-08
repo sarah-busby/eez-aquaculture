@@ -1,6 +1,6 @@
 # Determining EEZ Priority Zones for Aquaculture Species
 
-This repository contains materials for the third assignment for [EDS 223 - Geospatial Analysis & Remote Sensing](https://eds-223-geospatial.github.io/). Full instructions for this assignment can be found on [the course website](https://eds-223-geospatial.github.io/assignments/HW3.html). Per instructions, this repo explores suitable areas for potential marine aquaculture species along the West Coast of the US and determines priority Exclusive Economic Zones (EEZ) for these species based on the amount of suitbale area. The suitable area is determined based on range of suitable sea surface temperature (SST) and depth values for the species. The two species explored in this repo are oysters and red abalone. 
+This repository contains materials for the third assignment for [EDS 223 - Geospatial Analysis & Remote Sensing](https://eds-223-geospatial.github.io/). Full instructions for this assignment can be found on [the course website](https://eds-223-geospatial.github.io/assignments/HW3.html). Per instructions, this repo explores suitable areas for potential marine aquaculture species along the West Coast of the US and determines priority Exclusive Economic Zones (EEZ) for these species based on the amount of suitbale area within the region. The suitable area is determined based on range of suitable sea surface temperature (SST) and depth values for the species. The two species explored in this repo are oysters and red abalone. 
 
 ## Repository Structure
 ```
@@ -30,3 +30,11 @@ The data used can be accessed from Google Drive as a zip file [here](https://dri
 Script for analysis and visualization for the project can be found in `eez-analysis.qmd` and rendered as `eez-analysis.pdf`. The final code results in a function where an EEZ priority map can be created for any species by inputing the minimum and maximum SST and depth for a given species.
 
 ## References
+
+Flanders Marine Institute. (2026). Maritime boundaries: Exclusive Economic Zones (EEZ). Marine Regions. https://www.marineregions.org/eez.php
+
+GEBCO Bathymetric Compilation Group 2026. (2026). The GEBCO_2026 Grid: A continuous terrain model for oceans and land at 15 arc-second intervals. https://www.gebco.net/data-products/gridded-bathymetry-data#area
+
+National Oceanic and Atmospheric Administration, Coral Reef Watch. (2018). NOAA Coral Reef Watch Daily 5km Satellite Coral Bleaching Heat Stress SST Anomaly Product (Version 3.1). https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php
+
+Palomares, M. L. D., & Pauly, D. (Eds.). (2026). SeaLifeBase. https://www.sealifebase.ca/search.php

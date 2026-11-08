@@ -3,9 +3,9 @@ title: EEZ suitable for aquaculture species
 subtitle: EDS 223 HW Assignment \#3
 author: Sarah Busby
 date: 11/7/2026
-# format:
-#   pdf:
-#     colorlinks: true
+format:
+  pdf:
+    colorlinks: true
 ---
 This analysis aims to determine priority zones for potential aquaculture species along the West Coast based on suitable area for those species. This analysis will map priority zones for oyster and red abalone species. However, the function created can assess zones for many marine species given a species' suitable range of sea surface temperature and ocean depth.
 
@@ -128,28 +128,28 @@ The output is a map of the West Coast with priority EEZ regions for potential aq
 # Define function for visualizing eez priority zones for aquaculture
 
 priority_eez <- function(species, temp_min, temp_max,
-                                     depth_min, depth_max, 
-                                     eez, depth_sst_rast
-                                    ) {
+                         depth_min, depth_max, 
+                         eez, depth_sst_rast
+                        ) {
 
     # Define rcl for suitable depth & temp
     rcl_depth <- matrix(c(
         -Inf,      depth_min, 0,   
         depth_min, depth_max, 1,   
-        depth_max, Inf, 0    
+        depth_max, Inf,       0    
     ), ncol = 3, byrow = TRUE)
 
     rcl_temp <- matrix(c(
         -Inf,     temp_min, 0,   
         temp_min, temp_max, 1,   
-        temp_max, Inf, 0    
+        temp_max, Inf,      0    
     ), ncol = 3, byrow = TRUE)
 
-    # Reclassify depth and temp areas to suitable or not for species
+    # Reclassify depth and temp areas to suitable (1) or not (0) for species
     habitat_depth <- classify(depth_sst_rast[[1]], rcl = rcl_depth)
     habitat_temp <- classify(depth_sst_rast[[2]], rcl = rcl_temp)
 
-    # Create raster of suitable depth and temp habitat
+    # Create raster of habitat with suitable depth and temp
     species_habitat <- habitat_depth * habitat_temp
     levels(species_habitat) <- data.frame(
         value = 0:1,
@@ -174,17 +174,17 @@ priority_eez <- function(species, temp_min, temp_max,
     # Create map for priority eez zones
     title <- paste("Priority EEZ for", species, "\nbased on suitable habitat area")
     eez_map <- tm_basemap(server = "Esri.WorldTopoMap") +
-                tm_graticules(alpha=0.5) +
+                tm_graticules(alpha=0.75) +
                 tm_shape(eez_priority_zones) +
                 tm_polygons(fill='suitable_area_km2',
                             fill_alpha=0.5,
                             fill.scale = tm_scale_continuous(values='brewer.blues'),
-                            fill.legend = tm_legend(title="Suitable area in EEZ (km^2)")
+                            fill.legend = tm_legend(title="Suitable area in EEZ \n(km^2)")
                         ) +
                 tm_text('rgn_key') +
-                tm_title(title) +
+                tm_title_out(title, position = tm_pos_out("center", "top", pos.v = "bottom")) +
                 tm_compass(position = c("left", "bottom")) +
-                tm_layout(scale = 1)
+                tm_layout(scale = 0.75)
 
     # Return value
     return(eez_map) 
@@ -192,8 +192,7 @@ priority_eez <- function(species, temp_min, temp_max,
 ```
 
 ## Calculate priority EEZ regions for oyster aquaculture
-For oysters
-
+For oysters, research has shown that optimal growing conditions for oysters are a sea surface temperature of 11-30°C and depth of 0-70 meters below sea level.
 
 ```{r}
 #| warning: false
@@ -205,6 +204,9 @@ priority_eez(species='oyster',
                          eez = eez
                         )
 ```
+
+## Calculate priority EEZ regions for red abalone aquaculture
+Red abalone are another potential species of interest for marine aquaculture. Their optimal conditions are a sea surface temperature between 8-18°C and a depth of 0-24 meters below sea level [SeaLifeBase](https://www.sealifebase.ca/summary/Haliotis-rufescens.html).
 
 ```{r}
 #| warning: false
@@ -218,13 +220,21 @@ priority_eez(species='red abalone',
                         )
 ```
 
+## Map Interpretation
+### Oysters
+From the oyster map, the Central California coast appears to be the highest priority zone for potential oyster aquaculture, as this region contains more than 4,000 square kilometers of habitat with suitable sea surface temperature and depth for optimal oyster growth. The Southern Californian coast and Washington coast are the next highest priority areas, as they have close to 3,000 square kilometers of suitable area.
+
+### Red Abalone
+The red abalone map suggests the Washington coast is the highest priority EEZ, with over 2,000 square kilometers of suitable area for red abalone species. The Central Californian coast ranks second with over 1,500 square km. 
+
+### Map Limitations & Future Directions
+It is important to note, suitable habitat was determined solely by appropriate sea surface temperature and depth. While this is an initial step towards assessing places of interest for marine aquaculture, it does not take into account other limiting factors like the species impact on the local habitat, who owns the coastline/waters with suitable habitat, and the protected status of the area (e.g. MPAs). Future directions of the project could be incorporating these other factors into determining priority locations for aquaculture at a finer scale.
+
 ## Data Citations
 
 | Data | Citation | Link |
-| --- | --- | --- |
-| EEZ shapefiles | character | The name of the species. |
-| depth raster | character | The name of the species. |
-| SST rasters | character | The name of the species. |
-| Sea animal ranges | character | https://www.sealifebase.ca/summary/Haliotis-rufescens.html |
-
-https://www.sealifebase.ca/summary/Haliotis-rufescens.html
+| --- | --------- | --- |
+| EEZ shapefiles | Flanders Marine Institute. (2026). Maritime boundaries: Exclusive Economic Zones (EEZ). Marine Regions. https://www.marineregions.org/eez.php | [MarineRegions](https://www.marineregions.org/eez.php) |
+| depth raster | GEBCO Bathymetric Compilation Group 2026. (2026). The GEBCO_2026 Grid: A continuous terrain model for oceans and land at 15 arc-second intervals. https://www.gebco.net/data-products/gridded-bathymetry-data#area | [GEBCO](https://www.gebco.net/data-products/gridded-bathymetry-data#area) |
+| SST rasters | National Oceanic and Atmospheric Administration, Coral Reef Watch. (2018). NOAA Coral Reef Watch Daily 5km Satellite Coral Bleaching Heat Stress SST Anomaly Product (Version 3.1). https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php | [Coral Reef Watch](https://coralreefwatch.noaa.gov/product/5km/index_5km_ssta.php) |
+| Sea animal ranges | Bisby, F.A., M.A. Ruggiero, K.L. Wilson, M. Cachuela-Palacio, S.W. Kimani, Y.R. Roskov, A. Soulier-Perkins and J. van Hertum 2005 Species 2000 & ITIS Catalogue of Life: 2005 Annual Checklist. CD-ROM; Species 2000: Reading, U.K. (Ref. 19) | [SeaLifeBase Entry](https://www.sealifebase.ca/summary/Haliotis-rufescens.html) |

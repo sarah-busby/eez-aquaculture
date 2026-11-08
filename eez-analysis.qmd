@@ -47,7 +47,6 @@ sst_stack <- c(sst_08, sst_09, sst_10, sst_11, sst_12)
 
 ```{r}
 # Check if CRSs match
-
 if(!same.crs(eez, depth)){
   warning("Coordinate refrence systems do not match. CRS transformed to match EEZ")
   depth <- project(depth, "EPSG:4326")
@@ -105,13 +104,13 @@ if(!same.crs(depth, sst_mean)){
 Now that both rasters match, they can be stacked together.
 
 ```{r}
-# Stack depth and mean temp
+# Stack depth and mean sst
 depth_sst <- c(depth, sst_mean)
 ```
 
 ## Calculate suitable habitat and determine most suitable EEZ
 
-With a clean raster of depth and sst data for the region, the next steps are to compare the suitable SST and depth range of species to the area. The function below takes the following parameters:
+With a clean raster of depth and sst data for the region, the next steps are to compare the suitable SST and depth range of species to the area. Then, priority EEZ zones for potential aquaculture will be determined based on zones with the most suitable area for the species. The function below takes the following parameters:
 
 | Parameter | Class | Description |
 | --- | --- | --- |
@@ -123,12 +122,12 @@ With a clean raster of depth and sst data for the region, the next steps are to 
 | `eez` | sf, data.frame | The shapefiles of the EEZ regions with geometries. Contains `rgn` and `rgn_key` columns. |
 | `depth_sst_rast` | SpatRaster | A stacked raster with depth (layer 1) and SST (layer 2) data |
 
-The output is a map of the West Coast with EEZ priority sites for potential aquaculture of the species is shaded by the amount of suitable area within each region.
+The output is a map of the West Coast with priority EEZ regions for potential aquaculture shaded by the amount of suitable area for the given species within each zone.
 
 ```{r}
-# Define function for eez priority
+# Define function for visualizing eez priority zones for aquaculture
 
-priority_aquaculture_eez <- function(species, temp_min, temp_max,
+priority_eez <- function(species, temp_min, temp_max,
                                      depth_min, depth_max, 
                                      eez, depth_sst_rast
                                     ) {
@@ -199,7 +198,7 @@ For oysters
 ```{r}
 #| warning: false
 #| message: false
-priority_aquaculture_eez(species='oyster',
+priority_eez(species='oyster',
                          temp_min = 11, temp_max = 30, 
                          depth_min = -70, depth_max = 0,
                          depth_sst_rast = depth_sst,
@@ -211,7 +210,7 @@ priority_aquaculture_eez(species='oyster',
 #| warning: false
 #| message: false
 # Check suitable habitat for red abalone
-priority_aquaculture_eez(species='red abalone',
+priority_eez(species='red abalone',
                          temp_min = 8, temp_max = 18, 
                          depth_min = -24, depth_max = 0,
                          depth_sst_rast = depth_sst,
